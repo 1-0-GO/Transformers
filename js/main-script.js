@@ -5,9 +5,15 @@
 var activeCamera 
 const cameras = {};
 // 3D objects
-const objs = {};
+const updatables = [];
 // other 
 var scene, renderer;
+const arrowKeysState = {
+    'ArrowUp': false,
+    'ArrowDown': false,
+    'ArrowLeft': false,
+    'ArrowRight': false
+  };
 
 /////////////////////
 /* CREATE SCENE(S) */
@@ -16,7 +22,7 @@ function createScene(){
     'use strict';
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xadd8e6); // light-blue
-    createTrailer(15,0,0);
+    createTrailer(0, 0, -10);
     scene.add(new THREE.AxisHelper(20));    
 }
 
@@ -100,6 +106,7 @@ function createTrailer(x, y, z) {
 
     const container = createContainer(trailer);
     const params = container.geometry.parameters;
+    //adjust the position so the first wheel can be on 0, 0, 0
     container.position.set(-0.6 + 0.5*params.width, 0.8 + 0.5*params.height, -1.2 + 0.5*params.depth)
     const dx = -1.2 + params.width;
     const dz = 2.4; 
@@ -110,6 +117,21 @@ function createTrailer(x, y, z) {
     const wheel3 = createWheel(trailer, 0, 0, dz);
     createConnector(trailer, 0, 0.5, 0);
     trailer.position.set(x, y, z);
+
+    // trailer animation
+    updatables.push(trailer);
+    trailer.direction = new THREE.Vector3();
+    trailer.speed = 0.1;
+    trailer.tick = () => {
+        // Calculate the trailer's direction based on the pressed keys
+        trailer.direction.x = Number(arrowKeysState['ArrowRight']) - Number(arrowKeysState['ArrowLeft']);
+        trailer.direction.z = Number(arrowKeysState['ArrowUp']) - Number(arrowKeysState['ArrowDown'])
+        trailer.direction.normalize();
+
+        // Update the trailer's position based on the direction and speed
+        trailer.position.x += trailer.direction.x * trailer.speed;
+        trailer.position.z += trailer.direction.z * trailer.speed;
+    };
 
     scene.add(trailer);
 }
@@ -135,7 +157,9 @@ function handleCollisions(){
 ////////////
 function update(){
     'use strict';
-
+    for(const object of updatables) {
+        object.tick();
+    }
 }
 
 /////////////
@@ -161,6 +185,7 @@ function init() {
     createCameras();
 
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onResize);
 }
 
@@ -197,7 +222,14 @@ function onResize() {
 ///////////////////////
 function onKeyDown(e) {
     'use strict';
-
+    switch (e.key) {
+        case 'ArrowUp': 
+        case 'ArrowDown':
+        case 'ArrowLeft':
+        case 'ArrowRight':
+            arrowKeysState[e.key] = true;
+            break;
+    }
 }
 
 ///////////////////////
@@ -221,6 +253,12 @@ function onKeyUp(e){
         case '5':
             activeCamera = cameras['perspectiveCamera'];
             break; 
+        case 'ArrowUp': 
+        case 'ArrowDown':
+        case 'ArrowLeft':
+        case 'ArrowRight':
+            arrowKeysState[e.key] = false;
+            break;    
         default:
             // Do nothing for other keys
             return;
