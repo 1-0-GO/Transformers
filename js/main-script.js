@@ -16,7 +16,8 @@ function createScene(){
     'use strict';
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xadd8e6); // light-blue
-    createTrailer(0,0,0);
+    createTrailer(15,0,0);
+    scene.add(new THREE.AxisHelper(20));    
 }
 
 //////////////////////
@@ -47,11 +48,11 @@ function createPerspectiveCamera(x,y,z) {
 }
 
 function createCameras() {
-   cameras['frontalCamera'] = createOrthographicCamera(0, 0, 6); 
-   cameras['lateralCamera'] = createOrthographicCamera(-6, 0, 0); 
-   cameras['topCamera'] = createOrthographicCamera(0, 6, 0); 
-   cameras['isometricCamera'] = createOrthographicCamera(6, 6, 6); 
-   cameras['perspectiveCamera'] = createPerspectiveCamera(6, 6, 6); 
+   cameras['frontalCamera'] = createOrthographicCamera(0, 0, 30); 
+   cameras['lateralCamera'] = createOrthographicCamera(-30, 0, 0); 
+   cameras['topCamera'] = createOrthographicCamera(0, 30, 0); 
+   cameras['isometricCamera'] = createOrthographicCamera(30, 30, 30); 
+   cameras['perspectiveCamera'] = createPerspectiveCamera(30, 30, 30); 
    activeCamera = cameras['frontalCamera'];
 }
 
@@ -67,34 +68,27 @@ function createCameras() {
 /* CREATE TRAILER */
 
 function createContainer(trailer) {
-    const geometry = new THREE.BoxGeometry(4.8, 7.2, 9.6);
-    const materials =  new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+    const geometry = new THREE.BoxGeometry(4.8, 7.2, 12);
+    const materials =  new THREE.MeshBasicMaterial({ color: 0xff3232, wireframe: true});
     const container = new THREE.Mesh(geometry, materials);
-    container.name = 'container';
     
-    /*
-    const circleGeometry = new THREE.CircleGeometry(1, 32);
-    const circleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-    const circleMesh = new THREE.Mesh(circleGeometry, circleMaterial);
-    circleMesh.position.z = 4.8;
-    trailer.add(circleMesh);
-    */
-
-    trailer.add(container);  
+   trailer.add(container);  
+   return container;
 }
 
 function createWheel(trailer, x, y, z) {
-    const geometry = new THREE.CylinderGeometry(0.8, 0.8, 1.6, 32);
-    const material = new THREE.MeshBasicMaterial({ color: 0x0000ff, wireframe: true });
+    const geometry = new THREE.CylinderGeometry(0.8, 0.8, 1.2, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0x0000ff, wireframe: true});
     const wheel = new THREE.Mesh(geometry, material);
-    wheel.rotation.x = Math.PI / 2;
+    wheel.rotation.z = Math.PI / 2;
     wheel.position.set(x, y, z);
     trailer.add(wheel);
+    return wheel;
 }
 
 function createConnector(trailer, x, y, z) {
     const geometry = new THREE.BoxGeometry(2, 0.2, 0.2);
-    const material = new THREE.MeshPhongMaterial({ color: 0xff0000, wireframe: true });
+    const material = new THREE.MeshPhongMaterial({ color: 0xff0000, wireframe: true});
     const connector = new THREE.Mesh(geometry, material);
     connector.position.set(x, y, z);
     trailer.add(connector);
@@ -104,12 +98,16 @@ function createTrailer(x, y, z) {
     'use strict';
     const trailer = new THREE.Group();
 
-    createContainer(trailer);
+    const container = createContainer(trailer);
+    const params = container.geometry.parameters;
+    container.position.set(-0.6 + 0.5*params.width, 0.8 + 0.5*params.height, -1.2 + 0.5*params.depth)
+    const dx = -1.2 + params.width;
+    const dz = 2.4; 
 
-    createWheel(trailer, -2.4, -0.4, 0.6) 
-    createWheel(trailer, -2.4, -0.4, -0.6);
-    createWheel(trailer, 2.4, -0.4, 0.6);
-    createWheel(trailer, 2.4, -0.4, -0.6);
+    const wheel0 = createWheel(trailer, 0, 0, 0); 
+    const wheel1 = createWheel(trailer, dx, 0, 0);
+    const wheel2 = createWheel(trailer, dx, 0, dz);
+    const wheel3 = createWheel(trailer, 0, 0, dz);
     createConnector(trailer, 0, 0.5, 0);
     trailer.position.set(x, y, z);
 
