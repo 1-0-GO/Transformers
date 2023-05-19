@@ -5,8 +5,11 @@
 var activeCamera 
 const cameras = {};
 // 3D objects
+const axis = new THREE.AxisHelper(20);
 const updatables = [];
+const meshObjects = [];
 // other 
+const clock = new THREE.Clock();
 var scene, renderer;
 const arrowKeysState = {
     'ArrowUp': false,
@@ -14,6 +17,17 @@ const arrowKeysState = {
     'ArrowLeft': false,
     'ArrowRight': false
   };
+
+
+////////////////////////
+/* AUXILARY FUNCTIONS */
+////////////////////////
+function addMesh(object) {
+    if (object instanceof THREE.Mesh) {
+        meshObjects.push(object);
+    }
+    return object;
+}
 
 /////////////////////
 /* CREATE SCENE(S) */
@@ -23,7 +37,8 @@ function createScene(){
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xadd8e6); // light-blue
     createTrailer(0, 0, -10);
-    scene.add(new THREE.AxisHelper(20));    
+    axis.visible = false;
+    scene.add(axis);    
 }
 
 //////////////////////
@@ -76,7 +91,7 @@ function createCameras() {
 function createContainer(trailer) {
     const geometry = new THREE.BoxGeometry(4.8, 7.2, 12);
     const materials =  new THREE.MeshBasicMaterial({ color: 0xff3232, wireframe: true});
-    const container = new THREE.Mesh(geometry, materials);
+    const container = addMesh(new THREE.Mesh(geometry, materials));
     
    trailer.add(container);  
    return container;
@@ -85,7 +100,7 @@ function createContainer(trailer) {
 function createWheel(trailer, x, y, z) {
     const geometry = new THREE.CylinderGeometry(0.8, 0.8, 1.2, 32);
     const material = new THREE.MeshBasicMaterial({ color: 0x0000ff, wireframe: true});
-    const wheel = new THREE.Mesh(geometry, material);
+    const wheel = addMesh(new THREE.Mesh(geometry, material));
     wheel.rotation.z = Math.PI / 2;
     wheel.position.set(x, y, z);
     trailer.add(wheel);
@@ -94,8 +109,8 @@ function createWheel(trailer, x, y, z) {
 
 function createConnector(trailer, x, y, z) {
     const geometry = new THREE.BoxGeometry(2, 0.2, 0.2);
-    const material = new THREE.MeshPhongMaterial({ color: 0xff0000, wireframe: true});
-    const connector = new THREE.Mesh(geometry, material);
+    const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true});
+    const connector = addMesh(new THREE.Mesh(geometry, material));
     connector.position.set(x, y, z);
     trailer.add(connector);
 }
@@ -121,16 +136,16 @@ function createTrailer(x, y, z) {
     // trailer animation
     updatables.push(trailer);
     trailer.direction = new THREE.Vector3();
-    trailer.speed = 0.1;
-    trailer.tick = () => {
+    trailer.speed = 10;
+    trailer.tick = (delta) => {
         // Calculate the trailer's direction based on the pressed keys
         trailer.direction.x = Number(arrowKeysState['ArrowRight']) - Number(arrowKeysState['ArrowLeft']);
         trailer.direction.z = Number(arrowKeysState['ArrowUp']) - Number(arrowKeysState['ArrowDown'])
         trailer.direction.normalize();
 
-        // Update the trailer's position based on the direction and speed
-        trailer.position.x += trailer.direction.x * trailer.speed;
-        trailer.position.z += trailer.direction.z * trailer.speed;
+        // Update the trailer's position based on the direction, speed and time elapsed
+        trailer.position.x += trailer.direction.x * delta * trailer.speed;
+        trailer.position.z += trailer.direction.z * delta * trailer.speed;
     };
 
     scene.add(trailer);
@@ -157,8 +172,9 @@ function handleCollisions(){
 ////////////
 function update(){
     'use strict';
+    const delta = clock.getDelta();
     for(const object of updatables) {
-        object.tick();
+        object.tick(delta);
     }
 }
 
@@ -253,12 +269,20 @@ function onKeyUp(e){
         case '5':
             activeCamera = cameras['perspectiveCamera'];
             break; 
+        case '6':
+            for(const mesh of meshObjects) {
+                mesh.material.wireframe = !mesh.material.wireframe;
+            }
+            break;
+        case '7':
+            axis.visible = !axis.visible;
+            break;
         case 'ArrowUp': 
         case 'ArrowDown':
         case 'ArrowLeft':
         case 'ArrowRight':
             arrowKeysState[e.key] = false;
-            break;    
+            break;          
         default:
             // Do nothing for other keys
             return;
