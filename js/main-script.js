@@ -46,12 +46,14 @@ function createScene(){
 //////////////////////
 function createOrthographicCamera(x, y, z) {
     'use strict';
-    var camera = new THREE.OrthographicCamera( window.innerWidth / - 32,
-                                            window.innerWidth / 32, 
-                                            window.innerHeight / 32, 
-                                            window.innerHeight / - 32, 
-                                            0.1, 
-                                            1000 );
+    const frustumSize = 40;
+    const aspect = window.innerWidth / window.innerHeight;
+    var camera = new THREE.OrthographicCamera( frustumSize * aspect / - 2, 
+                                        frustumSize * aspect / 2,
+                                        frustumSize / 2, 
+                                        frustumSize / - 2, 
+                                        0.1, 
+                                        1000 );
     camera.position.set(x, y, z);
     camera.lookAt(scene.position);
     return camera;
@@ -73,7 +75,7 @@ function createCameras() {
    cameras['lateralCamera'] = createOrthographicCamera(-30, 0, 0); 
    cameras['topCamera'] = createOrthographicCamera(0, 30, 0); 
    cameras['isometricCamera'] = createOrthographicCamera(30, 30, 30); 
-   cameras['perspectiveCamera'] = createPerspectiveCamera(30, 30, 30); 
+   cameras['perspectiveCamera'] = createPerspectiveCamera(25, 25, 25); 
    activeCamera = cameras['frontalCamera'];
 }
 
@@ -225,10 +227,18 @@ function onResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     if (window.innerHeight > 0 && window.innerWidth > 0) {
+        const aspect = window.innerWidth / window.innerHeight;
         for (const key in cameras) {
             const camera = cameras[key];
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            if(camera.isPerspectiveCamera) {
+                camera.aspect = aspect;
+            } else {
+                camera.left = - frustumSize * aspect / 2;
+				camera.right = frustumSize * aspect / 2;
+				camera.top = frustumSize / 2;
+				camera.bottom = - frustumSize / 2;
+            }
+            camera.updateProjectionMatrix(); 
         }
     }
 }
