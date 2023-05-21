@@ -4,10 +4,13 @@
 // cameras
 var activeCamera 
 const cameras = {};
+const frustumSize = 40;
 // 3D objects
 const axis = new THREE.AxisHelper(20);
 const updatables = [];
 const meshObjects = [];
+const robotMainColor = 0xff3232;
+const blue = 0x0000ff;
 // other 
 const clock = new THREE.Clock();
 var scene, renderer;
@@ -37,6 +40,7 @@ function createScene(){
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xadd8e6); // light-blue
     createTrailer(0, 0, -10);
+    createRobot(0, 0, 10);
     axis.visible = false;
     scene.add(axis);    
 }
@@ -46,7 +50,6 @@ function createScene(){
 //////////////////////
 function createOrthographicCamera(x, y, z) {
     'use strict';
-    const frustumSize = 40;
     const aspect = window.innerWidth / window.innerHeight;
     var camera = new THREE.OrthographicCamera( frustumSize * aspect / - 2, 
                                         frustumSize * aspect / 2,
@@ -75,7 +78,7 @@ function createCameras() {
    cameras['lateralCamera'] = createOrthographicCamera(-30, 0, 0); 
    cameras['topCamera'] = createOrthographicCamera(0, 30, 0); 
    cameras['isometricCamera'] = createOrthographicCamera(30, 30, 30); 
-   cameras['perspectiveCamera'] = createPerspectiveCamera(25, 25, 25); 
+   cameras['perspectiveCamera'] = createPerspectiveCamera(18, 18, 18); 
    activeCamera = cameras['frontalCamera'];
 }
 
@@ -87,34 +90,45 @@ function createCameras() {
 /* CREATE OBJECT3D(S) */
 ////////////////////////
 
+function createBoxMesh(width, height, depth, color) {
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+ 
+    const materials =  new THREE.MeshBasicMaterial({ color: color, wireframe: true});
+    return addMesh(new THREE.Mesh(geometry, materials));
+}
 
-/* CREATE TRAILER */
-
-function createContainer(trailer) {
-    const geometry = new THREE.BoxGeometry(4.8, 7.2, 12);
-    const materials =  new THREE.MeshBasicMaterial({ color: 0xff3232, wireframe: true});
-    const container = addMesh(new THREE.Mesh(geometry, materials));
+function createContainer(group) {
+    const container = createBoxMesh(4.8, 7.2, 12, 0xcd8540);
     
-   trailer.add(container);  
+   group.add(container);  
    return container;
 }
 
-function createWheel(trailer, x, y, z) {
+function createWheel(group, x, y, z) {
     const geometry = new THREE.CylinderGeometry(0.8, 0.8, 1.2, 32);
-    const material = new THREE.MeshBasicMaterial({ color: 0x0000ff, wireframe: true});
+    const material = new THREE.MeshBasicMaterial({ color: blue, wireframe: true});
     const wheel = addMesh(new THREE.Mesh(geometry, material));
     wheel.rotation.z = Math.PI / 2;
     wheel.position.set(x, y, z);
-    trailer.add(wheel);
+    group.add(wheel);
     return wheel;
 }
 
-function createConnector(trailer, x, y, z) {
-    const geometry = new THREE.BoxGeometry(2, 0.2, 0.2);
-    const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true});
-    const connector = addMesh(new THREE.Mesh(geometry, material));
+function createWheelsOnPlatform(group, dx, dz) {
+    const wheels = new THREE.Group();
+
+    const wheel0 = createWheel(wheels, 0, 0, 0); 
+    const wheel1 = createWheel(wheels, dx, 0, 0);
+    const wheel2 = createWheel(wheels, dx, 0, dz);
+    const wheel3 = createWheel(wheels, 0, 0, dz);
+    group.add(wheels);
+    return wheels;
+}
+
+function createConnector(group, x, y, z) {
+    const connector = createBoxMesh(4.8, 0.8, 0.8, blue);
     connector.position.set(x, y, z);
-    trailer.add(connector);
+    group.add(connector);
 }
 
 function createTrailer(x, y, z) {
@@ -123,17 +137,14 @@ function createTrailer(x, y, z) {
 
     const container = createContainer(trailer);
     const params = container.geometry.parameters;
-    //adjust the position so the first wheel can be on 0, 0, 0
-    container.position.set(-0.6 + 0.5*params.width, 0.8 + 0.5*params.height, -1.2 + 0.5*params.depth)
+
     const dx = -1.2 + params.width;
     const dz = 2.4; 
 
-    const wheel0 = createWheel(trailer, 0, 0, 0); 
-    const wheel1 = createWheel(trailer, dx, 0, 0);
-    const wheel2 = createWheel(trailer, dx, 0, dz);
-    const wheel3 = createWheel(trailer, 0, 0, dz);
-    createConnector(trailer, 0, 0.5, 0);
-    trailer.position.set(x, y, z);
+    const wheels = createWheelsOnPlatform(trailer, dx, dz);
+    wheels.position.set(0.6 - 0.5*params.width, -0.8 - 0.5*params.height, 1.2 - 0.5*params.depth);
+
+    createConnector(trailer, 0, 0.4 - 0.5*params.height, 0.4 + 0.5*params.depth);
 
     // trailer animation
     updatables.push(trailer);
@@ -150,7 +161,68 @@ function createTrailer(x, y, z) {
         trailer.position.z += trailer.direction.z * delta * trailer.speed;
     };
 
+    trailer.position.set(x, y, z);
     scene.add(trailer);
+}
+
+function createBase(group) {
+    const base = createBoxMesh(2.8, 1.0, 2.8, robotMainColor);
+    
+   group.add(base);  
+   return base;
+}
+
+function createArm(group, x, y, z) {
+    const arm = createBoxMesh(1.0, 1.0, 2.8, robotMainColor);
+    
+   group.add(arm);  
+   return arm;
+}
+
+function createChest(group, x, y, z) {
+    const chest = createBoxMesh(4.8, 2.8, 2.8, robotMainColor);
+
+    chest.position.set(x, y, z);
+    group.add(chest);
+    return chest;
+}
+
+function createAntler(group, x, y, z) {
+    const antler = createBoxMesh(0.2, 1.4, 0.2, blue);
+    antler.position.set(x, y, z);
+    group.add(antler);
+    return antler;
+}
+
+function createHead(group, x, y, z) {
+    const characterHeadGroup = new THREE.Group();
+    const geometry = new THREE.CylinderGeometry(1.0, 1.0, 1.2, 32);
+    const material = new THREE.MeshBasicMaterial({ color: 0xffce00, wireframe: true});
+    const head = addMesh(new THREE.Mesh(geometry, material));
+    const antler1 = createAntler(characterHeadGroup, 1.0, 0, 0);
+    const antler2 = createAntler(characterHeadGroup, -1.0, 0, 0);
+    characterHeadGroup.add(head);
+
+
+    characterHeadGroup.position.set(x, y, z);
+    group.add(characterHeadGroup);
+    return characterHeadGroup;
+}
+
+function createRobot(x, y, z) {
+    const robot = new THREE.Group();
+    
+    const base = createBase(robot);
+    
+    const g1 = new THREE.Group();
+    const chest = createChest(g1, 0, 0, 0);
+    const head = createHead(g1, 0, 2.0, 0);
+    g1.position.set(0, 1.9, 0);
+    robot.add(g1);
+
+
+    robot.position.set(x, y, z);
+    scene.add(robot);
 }
 
 //////////////////////
