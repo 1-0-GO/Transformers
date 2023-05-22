@@ -271,22 +271,45 @@ function createUpperLeg(group, x, y, z) {
 }
 
 function createLowerLeg(group, x, y, z) {
-    const lowerLeg = createBoxMesh(1.6, 4.2, 1.6, green);
+    const lowerLeg = createBoxMesh(1.6, 3.6, 1.6, green);
     
     lowerLeg.position.set(x, y, z);
     group.add(lowerLeg);  
     return lowerLeg;
 }
 
+function createFoot(group, x ,y, z) {
+    const foot = createBoxMesh(2.0, 1.6, 2.6, green);
+    
+    foot.position.set(x, y, z);
+    group.add(foot);  
+    return foot;
+}
+
 function createLegs(group, dx, x, y, z) {
     const characterLegsGroup = new THREE.Group();
-    const upperLeg1 = createUpperLeg(characterLegsGroup, -dx, 0, 0);
-    const upperLeg2 = createUpperLeg(characterLegsGroup, dx, 0, 0);
-    const lowerLeg1 = createLowerLeg(characterLegsGroup, -dx, -0.9, 0);
-    const lowerLeg2 = createLowerLeg(characterLegsGroup, dx, -0.9, 0);
-
-    characterLegsGroup.position.set(x, y, z);
+    const l1 = new THREE.Group();
+    const upperLeg1 = createUpperLeg(l1, -dx, 0, 0);
+    const upperLeg2 = createUpperLeg(l1, dx, 0, 0);
+    const l2 = new THREE.Group();
+    const lowerLeg1 = createLowerLeg(l2, -dx, 0, 0);
+    const lowerLeg2 = createLowerLeg(l2, dx, 0, 0);
     
+    const feet = new THREE.Group();
+    const foot1 = createFoot(feet, -dx, 0, 0);
+    const foot2 = createFoot(feet, dx, 0, 0);
+    feet.position.set(0, -2.6, 0.5);
+    feet.tick = (delta) => {
+    };
+    updatables.push(feet);
+
+    l2.add(feet);
+    l2.position.set(0, -2.7, 0);
+    l1.add(l2);
+    l1.position.set(0, -0.9, 0);
+    characterLegsGroup.add(l1);
+    characterLegsGroup.position.set(x, y, z);
+
     characterLegsGroup.tick = (delta) => {
     };
     updatables.push(characterLegsGroup);
@@ -310,7 +333,7 @@ function createRobot(x, y, z) {
     g1.position.set(0, 1.9, 0.1);
     robot.add(g1);
 
-    const legs = createLegs(robot, -1.0, 0, -1.4, 0);
+    const legs = createLegs(robot, -1.1, 0, -0.5, 0);
 
 
     robot.position.set(x, y, z);
