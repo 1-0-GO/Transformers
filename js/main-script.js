@@ -11,6 +11,10 @@ const updatables = [];
 const meshObjects = [];
 const robotMainColor = 0xff3232;
 const blue = 0x0000ff;
+const yellow = 0xffce00;
+const purple = 0xb13aff;
+const light_brown = 0xcd8540;
+const green = 0x289A3A
 // other 
 const clock = new THREE.Clock();
 var scene, renderer;
@@ -98,7 +102,7 @@ function createBoxMesh(width, height, depth, color) {
 }
 
 function createContainer(group) {
-    const container = createBoxMesh(4.8, 7.2, 12, 0xcd8540);
+    const container = createBoxMesh(4.8, 7.2, 12, light_brown);
     
    group.add(container);  
    return container;
@@ -166,29 +170,70 @@ function createTrailer(x, y, z) {
 }
 
 function createBase(group) {
-    const base = createBoxMesh(2.8, 1.0, 2.8, robotMainColor);
+    const base = createBoxMesh(2.8, 1.0, 3.4, robotMainColor);
     
    group.add(base);  
    return base;
 }
 
-function createArm(group, x, y, z) {
-    const arm = createBoxMesh(1.0, 1.0, 2.8, robotMainColor);
+function createUpperArm(group, x, y, z) {
+    const arm = createBoxMesh(1.0, 4.2, 1.0, green);
     
+   arm.position.set(x, y, z);
    group.add(arm);  
    return arm;
 }
 
+function createForearm(group, x, y, z) {
+    const forearm = createBoxMesh(1.0, 1.0, 3.2, green);
+    
+   forearm.position.set(x, y, z);
+   group.add(forearm);  
+   return forearm;
+}
+
+function createArms(group, dx, x, y, z) {
+    const characterArmsGroup = new THREE.Group();
+    const upperArm1 = createUpperArm(characterArmsGroup, -dx, 0, 0);
+    const upperArm2 = createUpperArm(characterArmsGroup, dx, 0, 0);
+    const forearm1 = createForearm(characterArmsGroup, -dx, - 1.6, 2.1);
+    const forearm2 = createForearm(characterArmsGroup, dx, -1.6, 2.1);
+
+    characterArmsGroup.position.set(x, y, z);
+    
+    characterArmsGroup.tick = (delta) => {
+    };
+    updatables.push(characterArmsGroup);
+
+    group.add(characterArmsGroup);
+}
+
 function createChest(group, x, y, z) {
-    const chest = createBoxMesh(4.8, 2.8, 2.8, robotMainColor);
+    const chest = createBoxMesh(4.8, 2.8, 2.4, robotMainColor);
 
     chest.position.set(x, y, z);
     group.add(chest);
     return chest;
 }
+function createBack(group, x, y, z) {
+    const back = createBoxMesh(2.8, 2.8, 1.0, robotMainColor);
+
+    back.position.set(x, y, z);
+    group.add(back);
+    return back;
+}
+
+function createEye(group, x, y, z) {
+    const eye = createBoxMesh(0.5, 0.3, 0.2, purple);
+
+    eye.position.set(x, y, z);
+    group.add(eye);
+    return eye;
+}
 
 function createAntler(group, x, y, z) {
-    const antler = createBoxMesh(0.2, 1.4, 0.2, blue);
+    const antler = createBoxMesh(0.3, 1.6, 0.2, blue);
+
     antler.position.set(x, y, z);
     group.add(antler);
     return antler;
@@ -196,17 +241,57 @@ function createAntler(group, x, y, z) {
 
 function createHead(group, x, y, z) {
     const characterHeadGroup = new THREE.Group();
-    const geometry = new THREE.CylinderGeometry(1.0, 1.0, 1.2, 32);
-    const material = new THREE.MeshBasicMaterial({ color: 0xffce00, wireframe: true});
+
+    const geometry = new THREE.CylinderGeometry(1.0, 1.0, 1.4, 32);
+    const material = new THREE.MeshBasicMaterial({ color: yellow, wireframe: true});
     const head = addMesh(new THREE.Mesh(geometry, material));
-    const antler1 = createAntler(characterHeadGroup, 1.0, 0, 0);
-    const antler2 = createAntler(characterHeadGroup, -1.0, 0, 0);
     characterHeadGroup.add(head);
+
+    const rightAntler = createAntler(characterHeadGroup, 1.0, 0.1, 0);
+    const leftAntler = createAntler(characterHeadGroup, -1.0, 0.1, 0);
+    const rightEye = createEye(characterHeadGroup, 0.5, 0.3, 0.9);
+    const leftEye = createEye(characterHeadGroup, -0.5, 0.3, 0.9);
+    
+    characterHeadGroup.tick = (delta) => {
+    };
+    updatables.push(characterHeadGroup);
 
 
     characterHeadGroup.position.set(x, y, z);
     group.add(characterHeadGroup);
     return characterHeadGroup;
+}
+
+function createUpperLeg(group, x, y, z) {
+    const upperLeg = createBoxMesh(0.8, 1.8, 0.8, green);
+    
+    upperLeg.position.set(x, y, z);
+    group.add(upperLeg);  
+    return upperLeg;
+}
+
+function createLowerLeg(group, x, y, z) {
+    const lowerLeg = createBoxMesh(1.6, 4.2, 1.6, green);
+    
+    lowerLeg.position.set(x, y, z);
+    group.add(lowerLeg);  
+    return lowerLeg;
+}
+
+function createLegs(group, dx, x, y, z) {
+    const characterLegsGroup = new THREE.Group();
+    const upperLeg1 = createUpperLeg(characterLegsGroup, -dx, 0, 0);
+    const upperLeg2 = createUpperLeg(characterLegsGroup, dx, 0, 0);
+    const lowerLeg1 = createLowerLeg(characterLegsGroup, -dx, -0.9, 0);
+    const lowerLeg2 = createLowerLeg(characterLegsGroup, dx, -0.9, 0);
+
+    characterLegsGroup.position.set(x, y, z);
+    
+    characterLegsGroup.tick = (delta) => {
+    };
+    updatables.push(characterLegsGroup);
+
+    group.add(characterLegsGroup);
 }
 
 function createRobot(x, y, z) {
@@ -215,10 +300,17 @@ function createRobot(x, y, z) {
     const base = createBase(robot);
     
     const g1 = new THREE.Group();
-    const chest = createChest(g1, 0, 0, 0);
-    const head = createHead(g1, 0, 2.0, 0);
-    g1.position.set(0, 1.9, 0);
+    const chest = createChest(g1, 0, 0, 0.4);
+    const head = createHead(g1, 0, 2.1, -0.6);
+    const g12 = new THREE.Group();
+    const back = createBack(g12, 0, 0, 0);
+    const arms = createArms(g12, 1.9, 0, -0.3, 0) 
+    g12.position.set(0, 0, -1.3);
+    g1.add(g12);
+    g1.position.set(0, 1.9, 0.1);
     robot.add(g1);
+
+    const legs = createLegs(robot, -1.0, 0, -1.4, 0);
 
 
     robot.position.set(x, y, z);
@@ -302,7 +394,7 @@ function onResize() {
         const aspect = window.innerWidth / window.innerHeight;
         for (const key in cameras) {
             const camera = cameras[key];
-            if(camera.isPerspectiveCamera) {
+            if(key === 'perspectiveCamera') {
                 camera.aspect = aspect;
             } else {
                 camera.left = - frustumSize * aspect / 2;
