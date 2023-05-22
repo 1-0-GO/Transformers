@@ -262,16 +262,21 @@ function createHead(group, x, y, z) {
     return characterHeadGroup;
 }
 
-function createUpperLeg(group, x, y, z) {
-    const upperLeg = createBoxMesh(0.8, 1.8, 0.8, green);
+function createUpperLeg(group, x, y, z, side) {
+    sign = {'l': -1.0, 'r': 1.0};
+    const upperLeg = createBoxMesh(0.8, 2.8, 0.8, yellow);
+    const wheel = createWheel(upperLeg, sign[side] * 1.0, 0.2, 0);
     
     upperLeg.position.set(x, y, z);
     group.add(upperLeg);  
     return upperLeg;
 }
 
-function createLowerLeg(group, x, y, z) {
+function createLowerLeg(group, x, y, z, side) {
+    sign = {'l': -1, 'r': 1};
     const lowerLeg = createBoxMesh(1.6, 3.6, 1.6, green);
+    const wheel1 = createWheel(lowerLeg, sign[side] * 1.0, 0.4, 0);
+    const wheel2 = createWheel(lowerLeg, sign[side] * 1.0, -1.6, 0);
     
     lowerLeg.position.set(x, y, z);
     group.add(lowerLeg);  
@@ -289,11 +294,11 @@ function createFoot(group, x ,y, z) {
 function createLegs(group, dx, x, y, z) {
     const characterLegsGroup = new THREE.Group();
     const l1 = new THREE.Group();
-    const upperLeg1 = createUpperLeg(l1, -dx, 0, 0);
-    const upperLeg2 = createUpperLeg(l1, dx, 0, 0);
+    const upperLeg1 = createUpperLeg(l1, -dx, 0, 0, 'l');
+    const upperLeg2 = createUpperLeg(l1, dx, 0, 0, 'r');
     const l2 = new THREE.Group();
-    const lowerLeg1 = createLowerLeg(l2, -dx, 0, 0);
-    const lowerLeg2 = createLowerLeg(l2, dx, 0, 0);
+    const lowerLeg1 = createLowerLeg(l2, -dx, 0, 0, 'l');
+    const lowerLeg2 = createLowerLeg(l2, dx, 0, 0, 'r');
     
     const feet = new THREE.Group();
     const foot1 = createFoot(feet, -dx, 0, 0);
@@ -304,9 +309,9 @@ function createLegs(group, dx, x, y, z) {
     updatables.push(feet);
 
     l2.add(feet);
-    l2.position.set(0, -2.7, 0);
+    l2.position.set(0, -3.2, 0);
     l1.add(l2);
-    l1.position.set(0, -0.9, 0);
+    l1.position.set(0, -1.4, 0);
     characterLegsGroup.add(l1);
     characterLegsGroup.position.set(x, y, z);
 
@@ -333,7 +338,7 @@ function createRobot(x, y, z) {
     g1.position.set(0, 1.9, 0.1);
     robot.add(g1);
 
-    const legs = createLegs(robot, -1.1, 0, -0.5, 0);
+    const legs = createLegs(robot, 1.1, 0, -0.5, 0);
 
 
     robot.position.set(x, y, z);
