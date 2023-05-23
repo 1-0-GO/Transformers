@@ -2,7 +2,7 @@
 /* GLOBAL VARIABLES */
 //////////////////////
 // cameras
-var activeCamera 
+var activeCamera; 
 const cameras = {};
 const frustumSize = 40;
 // 3D objects
@@ -22,7 +22,10 @@ const arrowKeysState = {
     'ArrowUp': false,
     'ArrowDown': false,
     'ArrowLeft': false,
-    'ArrowRight': false
+    'ArrowRight': false,
+    'q': false,
+    'a': false,
+    'w': false
   };
 
 
@@ -455,7 +458,8 @@ function onKeyDown(e) {
 ///////////////////////
 function onKeyUp(e){
     'use strict';
-    switch (e.key) {
+    var key = e.key;
+    switch (key) {
         case '1':
             activeCamera = cameras['frontalCamera'];
             break;
@@ -479,11 +483,17 @@ function onKeyUp(e){
         case '7':
             axis.visible = !axis.visible;
             break;
+        case 'a':
+        case 'A': 
+        case 'q':
+        case 'Q':
+            key = e.key.toLowerCase();
+            console.log(key);
         case 'ArrowUp': 
         case 'ArrowDown':
         case 'ArrowLeft':
         case 'ArrowRight':
-            arrowKeysState[e.key] = false;
+            arrowKeysState[key] = false;
             break;          
         default:
             // Do nothing for other keys
