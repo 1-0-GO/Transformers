@@ -9,6 +9,8 @@ const frustumSize = 40;
 const axis = new THREE.AxisHelper(20);
 const updatables = [];
 const meshObjects = [];
+const collisionObjects = {};
+var collision = false;
 const robotMainColor = 0xff3232;
 const blue = 0x0000ff;
 const yellow = 0xffce00;
@@ -169,6 +171,8 @@ function createTrailer(x, y, z) {
     };
 
     trailer.position.set(x, y, z);
+
+    collisionObjects['trailer'] = trailer;
     scene.add(trailer);
 }
 
@@ -345,15 +349,69 @@ function createRobot(x, y, z) {
 
 
     robot.position.set(x, y, z);
+
+    collisionObjects['robot'] = robot;
     scene.add(robot);
+}
+
+function calculateAABB(object) {
+    const tempVector = new THREE.Vector3();
+    var minPoint = new THREE.Vector3( + Infinity, + Infinity, + Infinity );
+    var maxPoint = new THREE.Vector3( - Infinity, - Infinity, - Infinity );
+
+    object.updateMatrixWorld(true);
+
+    object.traverse(function(node) {
+        if(node instanceof THREE.Mesh) {
+            const vertices = node.geometry.vertices;
+            const vertexCount = vertices.length;
+
+            for(let i = 0; i < vertexCount; i++) {
+                tempVector.copy(vertices[i]);
+                tempVector.applyMatrix4(node.matrixWorld);
+                
+                minPoint.min(tempVector);
+                maxPoint.max(tempVector);
+            }
+        }
+    });
+
+    return {minPoint, maxPoint};
 }
 
 //////////////////////
 /* CHECK COLLISIONS */
 //////////////////////
-function checkCollisions(){
+function checkCollisions() {
     'use strict';
-
+    const robotAABB = calculateAABB(collisionObjects['robot']);
+    const trailerAABB = calculateAABB(collisionObjects['trailer']);
+    const robotMax = robotAABB.maxPoint;
+    const robotMin = robotAABB.minPoint;
+    const trailerMax = trailerAABB.maxPoint;
+    const trailerMin = trailerAABB.minPoint;
+    
+    if (!(robotMax.x > trailerMin.x)) {
+        return false;
+    }
+    if (!(robotMin.x < trailerMax.x)) {
+        return false;
+    }
+    if (!(robotMax.y > trailerMin.y)) {
+        return false;
+    }
+    if (!(robotMin.y < trailerMax.y)) {
+        return false;
+    }
+    if (!(robotMax.z > trailerMin.z)) {
+        return false;
+    }
+    if (!(robotMin.z < trailerMax.z)) {
+        return false;
+    }
+    
+    // All conditions are satisfied so the AABB's do intersect.
+    return true;
 }
 
 ///////////////////////
@@ -373,6 +431,7 @@ function update(){
     for(const object of updatables) {
         object.tick(delta);
     }
+    collision = checkCollisions();
 }
 
 /////////////
@@ -443,12 +502,18 @@ function onResize() {
 ///////////////////////
 function onKeyDown(e) {
     'use strict';
-    switch (e.key) {
+    var key = e.key;
+    switch (key) {
+        case 'a':
+        case 'A': 
+        case 'q':
+        case 'Q':
+            key = key.toLowerCase();
         case 'ArrowUp': 
         case 'ArrowDown':
         case 'ArrowLeft':
         case 'ArrowRight':
-            arrowKeysState[e.key] = true;
+            arrowKeysState[key] = true;
             break;
     }
 }
@@ -487,8 +552,7 @@ function onKeyUp(e){
         case 'A': 
         case 'q':
         case 'Q':
-            key = e.key.toLowerCase();
-            console.log(key);
+            key = key.toLowerCase();
         case 'ArrowUp': 
         case 'ArrowDown':
         case 'ArrowLeft':
