@@ -155,25 +155,33 @@ function createTrailer(x, y, z) {
 
     createConnector(trailer, 0, 0.4 - 0.5*params.height, 0.4 + 0.5*params.depth);
 
-    // trailer animation
-    updatables.push(trailer);
-    trailer.direction = new THREE.Vector3();
-    trailer.speed = 10;
-    trailer.tick = (delta) => {
-        // Calculate the trailer's direction based on the pressed keys
-        trailer.direction.x = Number(arrowKeysState['ArrowRight']) - Number(arrowKeysState['ArrowLeft']);
-        trailer.direction.z = Number(arrowKeysState['ArrowUp']) - Number(arrowKeysState['ArrowDown'])
-        trailer.direction.normalize();
-
-        // Update the trailer's position based on the direction, speed and time elapsed
-        trailer.position.x += trailer.direction.x * delta * trailer.speed;
-        trailer.position.z += trailer.direction.z * delta * trailer.speed;
-    };
-
     trailer.position.set(x, y, z);
 
-    collisionObjects['trailer'] = trailer;
     scene.add(trailer);
+
+    collisionObjects['trailer'] = trailer;
+    const trailerAABB = calculateAABB(trailer);
+    trailer.userData = {
+        speed: 10,
+        AABB: {
+            min: trailerAABB.minPoint.sub(trailer.position),
+            max: trailerAABB.maxPoint.sub(trailer.position)
+        }
+    };
+
+    // trailer animation
+    updatables.push(trailer);
+    const direction = new THREE.Vector3();
+    trailer.tick = (delta) => {
+        // Calculate the trailer's direction based on the pressed keys
+        direction.x = Number(arrowKeysState['ArrowRight']) - Number(arrowKeysState['ArrowLeft']);
+        direction.z = Number(arrowKeysState['ArrowUp']) - Number(arrowKeysState['ArrowDown'])
+        direction.normalize();
+
+        // Update the trailer's position based on the direction, speed and time elapsed
+        trailer.position.x += direction.x * delta * trailer.userData.speed;
+        trailer.position.z += direction.z * delta * trailer.userData.speed;
+    };
 }
 
 function createBase(group) {
@@ -350,8 +358,17 @@ function createRobot(x, y, z) {
 
     robot.position.set(x, y, z);
 
-    collisionObjects['robot'] = robot;
     scene.add(robot);
+
+    collisionObjects['robot'] = robot;
+
+    const robotAABB = calculateAABB(robot);
+    robot.userData = {
+        AABB: {
+            min: robotAABB.minPoint.sub(robot.position),
+            max: robotAABB.maxPoint.sub(robot.position)
+        }
+    };
 }
 
 function calculateAABB(object) {
@@ -384,34 +401,23 @@ function calculateAABB(object) {
 //////////////////////
 function checkCollisions() {
     'use strict';
-    const robotAABB = calculateAABB(collisionObjects['robot']);
-    const trailerAABB = calculateAABB(collisionObjects['trailer']);
-    const robotMax = robotAABB.maxPoint;
-    const robotMin = robotAABB.minPoint;
-    const trailerMax = trailerAABB.maxPoint;
-    const trailerMin = trailerAABB.minPoint;
-    
-    if (!(robotMax.x > trailerMin.x)) {
-        return false;
-    }
-    if (!(robotMin.x < trailerMax.x)) {
-        return false;
-    }
-    if (!(robotMax.y > trailerMin.y)) {
-        return false;
-    }
-    if (!(robotMin.y < trailerMax.y)) {
-        return false;
-    }
-    if (!(robotMax.z > trailerMin.z)) {
-        return false;
-    }
-    if (!(robotMin.z < trailerMax.z)) {
-        return false;
-    }
-    
-    // All conditions are satisfied so the AABB's do intersect.
-    return true;
+    const robot = collisionObjects['robot'];
+    const trailer = collisionObjects['trailer'];
+    const robotAABB = robot.userData.AABB;
+    const trailerAABB = trailer.userData.AABB;
+    const robotMax = robotAABB.max.clone().add(robot.position);
+    const robotMin = robotAABB.min.clone().add(robot.position);
+    const trailerMax = trailerAABB.max.clone().add(trailer.position);
+    const trailerMin = trailerAABB.min.clone().add(trailer.position);
+
+    return (
+        robotMax.x > trailerMin.x &&
+        robotMin.x < trailerMax.x &&
+        robotMax.y > trailerMin.y &&
+        robotMin.y < trailerMax.y &&
+        robotMax.z > trailerMin.z &&
+        robotMin.z < trailerMax.z
+      );
 }
 
 ///////////////////////
