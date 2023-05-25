@@ -11,7 +11,7 @@ const updatables = [];
 const meshObjects = [];
 const collisionObjects = {};
 var collision = false;
-const robotMainColor = 0xff3232;
+const red = 0xff3232;
 const blue = 0x0000ff;
 const yellow = 0xffce00;
 const purple = 0xb13aff;
@@ -156,7 +156,6 @@ function createTrailer(x, y, z) {
     createConnector(trailer, 0, 0.4 - 0.5*params.height, 0.4 + 0.5*params.depth);
 
     trailer.position.set(x, y, z);
-
     scene.add(trailer);
 
     collisionObjects['trailer'] = trailer;
@@ -185,7 +184,7 @@ function createTrailer(x, y, z) {
 }
 
 function createBase(group) {
-    const base = createBoxMesh(2.8, 1.0, 3.4, robotMainColor);
+    const base = createBoxMesh(2.8, 1.0, 3.4, red);
     
    group.add(base);  
    return base;
@@ -224,14 +223,14 @@ function createArms(group, dx, x, y, z) {
 }
 
 function createChest(group, x, y, z) {
-    const chest = createBoxMesh(4.8, 2.8, 2.4, robotMainColor);
+    const chest = createBoxMesh(4.8, 2.8, 2.4, red);
 
     chest.position.set(x, y, z);
     group.add(chest);
     return chest;
 }
 function createBack(group, x, y, z) {
-    const back = createBoxMesh(2.8, 2.8, 1.0, robotMainColor);
+    const back = createBoxMesh(2.8, 2.8, 1.0, red);
 
     back.position.set(x, y, z);
     group.add(back);
@@ -270,7 +269,6 @@ function createHead(group, x, y, z) {
     characterHeadGroup.tick = (delta) => {
     };
     updatables.push(characterHeadGroup);
-
 
     characterHeadGroup.position.set(x, y, z);
     group.add(characterHeadGroup);
@@ -355,13 +353,10 @@ function createRobot(x, y, z) {
 
     const legs = createLegs(robot, 1.1, 0, -0.5, 0);
 
-
     robot.position.set(x, y, z);
-
     scene.add(robot);
 
     collisionObjects['robot'] = robot;
-
     const robotAABB = calculateAABB(robot);
     robot.userData = {
         AABB: {
