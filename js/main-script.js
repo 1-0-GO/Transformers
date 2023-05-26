@@ -35,17 +35,39 @@ const arrowKeysState = {
     'ArrowRight': false,
     'q': false,
     'a': false,
-    'w': false
+    'w': false,
+    's': false,
+    'e': false,
+    'd': false,
+    'r': false,
+    'f': false,
   };
 
 
 ////////////////////////
 /* AUXILARY FUNCTIONS */
 ////////////////////////
+function addEdges(mesh) {
+    const geometry = mesh.geometry;
+    if(geometry instanceof THREE.CylinderGeometry) {
+        return;
+    }
+    const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry), 
+        new THREE.LineBasicMaterial({
+            color: 0x000000,
+            linewidth: 1,
+        })
+    )
+
+    mesh.add(edges);
+}
+
 function addMesh(object) {
     if (object instanceof THREE.Mesh) {
         meshObjects.push(object);
     }
+    addEdges(object);
     return object;
 }
 
@@ -57,8 +79,8 @@ function createScene(){
     'use strict';
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xadd8e6); // light-blue
-    createTrailer(0, 0, -10);
-    createRobot(0, 0, 10);
+    createTrailer(0, 0, -12.0);
+    createRobot(0, -4.0, 12.0);
     axis.visible = false;
     scene.add(axis);    
 }
@@ -102,7 +124,7 @@ function createCameras() {
    cameras['4'] = createOrthographicCamera(30, 30, 30); 
    // isometric perspective
    cameras['5'] = createPerspectiveCamera(18, 18, 18); 
-   activeCamera = cameras['4'];
+   activeCamera = cameras['1'];
 }
 
 /////////////////////
@@ -149,7 +171,7 @@ function createWheelsOnPlatform(group, dx, dz) {
 }
 
 function createConnector(group, x, y, z) {
-    const connector = createBoxMesh(4.8, 0.8, 0.8, blue);
+    const connector = createBoxMesh(4.8, 0.8, 0.8, green);
     connector.name = 'connector';
     connector.position.set(x, y, z);
     group.add(connector);
@@ -188,11 +210,11 @@ function createTrailer(x, y, z) {
    
     // trailer animation
     updatables.push(trailer);
-    const direction = new THREE.Vector3();
     trailer.userData.tick = (delta) => {
         if(collisionAnimation.isAnimating) {
             return;
         }
+        const direction = new THREE.Vector3();
         // Calculate the trailer's direction based on the pressed keys
         direction.x = Number(arrowKeysState['ArrowRight']) - Number(arrowKeysState['ArrowLeft']);
         direction.z = Number(arrowKeysState['ArrowUp']) - Number(arrowKeysState['ArrowDown'])
@@ -205,9 +227,14 @@ function createTrailer(x, y, z) {
         newPosition.x += dx;
         newPosition.z += dz;
         
+        // If it's not in truck mode we don't check collisions
+        if(!robot.userData.isTruck()) {
+            trailer.position.copy(newPosition);
+            return;
+        }
+
         // Check for collisions, record it and only update the position if there aren't any collisions
         const hasCollision = (checkCollisions(trailer, newPosition).length > 0);
-        console.log(hasCollision);
         if(!hasCollision) {
             trailer.position.copy(newPosition);
         } else {
@@ -233,9 +260,19 @@ function createBase(group) {
 
 function createUpperArm(group, x, y, z) {
     const arm = createBoxMesh(1.0, 4.2, 1.0, green);
+    const geometry = new THREE.CylinderGeometry(0.5, 0.5, 2.8, 32);
+    const geometry2 = new THREE.CylinderGeometry(0.3, 0.3, 2.4, 32);
+    const material = new THREE.MeshBasicMaterial({ color: blue, wireframe: true});
+    const bottomExhaust = addMesh(new THREE.Mesh(geometry, material));
+    const topExhaust = addMesh(new THREE.Mesh(geometry2, material));
+
+    bottomExhaust.position.set(Math.sign(x) * 1.0, 0.6, 0);
+    topExhaust.position.set(Math.sign(x) * 1.0, 1.8, 0);
     
    arm.position.set(x, y, z);
    group.add(arm);  
+   arm.add(bottomExhaust);
+   arm.add(topExhaust);
    return arm;
 }
 
@@ -247,20 +284,46 @@ function createForearm(group, x, y, z) {
    return forearm;
 }
 
+function armsAnimation(group, side) {
+    const sign = {'l': -1.0, 'r': 1.0};
+    group.userData.tick = (delta) => {
+        const speed = 10;
+        const direction = new THREE.Vector3();
+        direction.x = Number(arrowKeysState['e']) - Number(arrowKeysState['d']);
+        const displacement = direction.clone().multiplyScalar(delta * speed * sign[side]);
+        const newPosition = group.position.clone();
+        newPosition.add(displacement);
+        const positionX = newPosition.x;
+        if((sign[side] * positionX) <= 0 && Math.abs(positionX) <= 1.1) {
+            group.position.copy(newPosition);
+        }
+    };
+    updatables.push(group);
+}
+
 function createArms(group, dx, x, y, z) {
     const characterArmsGroup = new THREE.Group();
-    const upperArm1 = createUpperArm(characterArmsGroup, -dx, 0, 0);
-    const upperArm2 = createUpperArm(characterArmsGroup, dx, 0, 0);
-    const forearm1 = createForearm(characterArmsGroup, -dx, - 1.6, 2.1);
-    const forearm2 = createForearm(characterArmsGroup, dx, -1.6, 2.1);
+    const leftGroup = new THREE.Group();
+    const rightGroup = new THREE.Group();
+    const upperArm1 = createUpperArm(rightGroup, -dx, 0, 0);
+    const upperArm2 = createUpperArm(leftGroup, dx, 0, 0);
+    const forearm1 = createForearm(rightGroup, -dx, - 1.6, 2.1);
+    const forearm2 = createForearm(leftGroup, dx, -1.6, 2.1);
 
+    characterArmsGroup.add(leftGroup);
+    characterArmsGroup.add(rightGroup);
     characterArmsGroup.position.set(x, y, z);
-    
-    characterArmsGroup.userData.tick = (delta) => {
-    };
-    updatables.push(characterArmsGroup);
 
+    armsAnimation(leftGroup, 'l');
+    armsAnimation(rightGroup, 'r');
+    
     group.add(characterArmsGroup);
+
+    characterArmsGroup.userData.inTruckMode = () => {
+        return Math.abs(leftGroup.position.x) < 0.2;
+    }
+
+    return characterArmsGroup;
 }
 
 function createChest(group, x, y, z) {
@@ -295,6 +358,7 @@ function createAntler(group, x, y, z) {
 }
 
 function createHead(group, x, y, z) {
+    rotationHeadGroup = new THREE.Group();
     const characterHeadGroup = new THREE.Group();
 
     const geometry = new THREE.CylinderGeometry(1.0, 1.0, 1.4, 32);
@@ -308,16 +372,39 @@ function createHead(group, x, y, z) {
     const leftEye = createEye(characterHeadGroup, -0.5, 0.3, 0.9);
     
     characterHeadGroup.userData.tick = (delta) => {
+        const speed = 10;
+        const rotationDirection = new THREE.Vector3();
+        rotationDirection.x = Number(arrowKeysState['r']) - Number(arrowKeysState['f']);
+        const rotationVector = rotationDirection.clone().multiplyScalar(delta * speed);
+        const newRotation = rotationHeadGroup.rotation.clone();
+        newRotation.x += rotationVector.x;
+        if(newRotation.x > Math.PI) {
+            newRotation.x = Math.PI;
+        } else if (newRotation.x < -Math.PI) {
+            newRotation.x = -Math.PI;
+        } 
+        if(newRotation.x <= Math.PI && newRotation.x >= -Math.PI) {
+            rotationHeadGroup.rotation.copy(newRotation);
+        }
+
     };
     updatables.push(characterHeadGroup);
 
-    characterHeadGroup.position.set(x, y, z);
-    group.add(characterHeadGroup);
+    characterHeadGroup.position.set(0, 0.7, 0);
+    rotationHeadGroup.add(characterHeadGroup);
+    rotationHeadGroup.position.set(x, y - 0.7, z);
+    rotationHeadGroup.rotation.x = Math.PI;
+    group.add(rotationHeadGroup);
+    
+    characterHeadGroup.userData.inTruckMode = () =>  {
+        return (Math.PI - Math.abs(rotationHeadGroup.rotation.x)) === 0;
+    }
+
     return characterHeadGroup;
 }
 
 function createUpperLeg(group, x, y, z, side) {
-    sign = {'l': -1.0, 'r': 1.0};
+    const sign = {'l': -1.0, 'r': 1.0};
     const upperLeg = createBoxMesh(0.8, 2.8, 0.8, yellow);
     const wheel = createWheel(upperLeg, sign[side] * 1.0, 0.2, 0);
     
@@ -357,8 +444,21 @@ function createLegs(group, dx, x, y, z) {
     const feet = new THREE.Group();
     const foot1 = createFoot(feet, -dx, 0, 0);
     const foot2 = createFoot(feet, dx, 0, 0);
-    feet.position.set(0, -2.6, 0.5);
+    feet.position.set(0, -2.4, 0);
+    feet.rotation.x = Math.PI/2;
     feet.userData.tick = (delta) => {
+        const speed = 10;
+        const rotationDirection = new THREE.Vector3();
+        rotationDirection.x = Number(arrowKeysState['q']) - Number(arrowKeysState['a']);
+        const rotationVector = rotationDirection.clone().multiplyScalar(delta * speed);
+        const newRotation = feet.rotation.clone();
+        newRotation.x += rotationVector.x;
+        if(newRotation.x > Math.PI/2) {
+            newRotation.x = Math.PI/2;
+        } else if (newRotation.x < -Math.PI/2) {
+            newRotation.x = -Math.PI/2;
+        }
+        feet.rotation.copy(newRotation);
     };
     updatables.push(feet);
 
@@ -370,10 +470,29 @@ function createLegs(group, dx, x, y, z) {
     characterLegsGroup.position.set(x, y, z);
 
     characterLegsGroup.userData.tick = (delta) => {
+        const speed = 10;
+        const rotationDirection = new THREE.Vector3();
+        rotationDirection.x = Number(arrowKeysState['w']) - Number(arrowKeysState['s']);
+        const rotationVector = rotationDirection.clone().multiplyScalar(delta * speed);
+        const newRotation = characterLegsGroup.rotation.clone();
+        newRotation.x += rotationVector.x;
+        if(newRotation.x > Math.PI/2) {
+            newRotation.x = Math.PI/2;
+        } else if (newRotation.x < 0) {
+            newRotation.x = 0;
+        }
+        characterLegsGroup.rotation.copy(newRotation);
     };
     updatables.push(characterLegsGroup);
 
+    characterLegsGroup.rotation.x = Math.PI/2;
     group.add(characterLegsGroup);
+
+    characterLegsGroup.userData.inTruckMode = () => {
+        return (Math.PI/2 - characterLegsGroup.rotation.x) === 0 &&
+               (Math.PI/2 - Math.abs(feet.rotation.x)) === 0;
+    }
+    return characterLegsGroup;
 }
 
 function createRobot(x, y, z) {
@@ -392,7 +511,7 @@ function createRobot(x, y, z) {
     g1.position.set(0, 1.9, 0.1);
     robot.add(g1);
 
-    const legs = createLegs(robot, 1.1, 0, -0.5, 0);
+    const legs = createLegs(robot, 1.1, 0, -0.5, -0.5);
 
     robot.position.set(x, y, z);
     scene.add(robot);
@@ -401,15 +520,22 @@ function createRobot(x, y, z) {
     robot.userData = {
         type: 'robot',
         index: collisionObjects.length,
-        connectionPoint: new THREE.Vector3(0, 0, 0),
+        connectionPoint: new THREE.Vector3(0, 0, -3.7),
         AABB: {
             min: robotAABB.minPoint.sub(robot.position),
             max: robotAABB.maxPoint.sub(robot.position)
         }
     };
 
+    robot.userData.isTruck = () => {
+        return (legs.userData.inTruckMode() && 
+                arms.userData.inTruckMode() &&
+                head.userData.inTruckMode());
+    };
+
     collisionObjects.push(robot);
 }
+
 
 function calculateAABB(object) {
     const tempVector = new THREE.Vector3();
@@ -573,10 +699,22 @@ function onKeyDown(e) {
     'use strict';
     var key = e.key;
     switch (key) {
-        case 'a':
-        case 'A': 
         case 'q':
         case 'Q':
+        case 'a':
+        case 'A': 
+        case 'w':
+        case 'W':
+        case 's':
+        case 'S':
+        case 'e':
+        case 'E': 
+        case 'd':
+        case 'D':
+        case 'r':
+        case 'R': 
+        case 'f':
+        case 'F':
             key = key.toLowerCase();
         case 'ArrowUp': 
         case 'ArrowDown':
@@ -611,10 +749,22 @@ function onKeyUp(e){
         case '7':
             axis.visible = !axis.visible;
             break;
-        case 'a':
-        case 'A': 
         case 'q':
         case 'Q':
+        case 'a':
+        case 'A': 
+        case 'w':
+        case 'W':
+        case 's':
+        case 'S':
+        case 'e':
+        case 'E': 
+        case 'd':
+        case 'D':
+        case 'r':
+        case 'R': 
+        case 'f':
+        case 'F':
             key = key.toLowerCase();
         case 'ArrowUp': 
         case 'ArrowDown':
