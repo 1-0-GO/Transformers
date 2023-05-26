@@ -12,8 +12,13 @@ var trailer;
 const updatables = [];
 const meshObjects = [];
 const collisionObjects = [];
-const collisionMatrix = [];
-const collisionHandlers = [];
+var collisionAnimation = {
+    isAnimating: false,
+    startPosition: undefined,
+    endPosition: undefined,
+    duration: undefined,
+    startTime: undefined
+}    
 const red = 0xff3232;
 const blue = 0x0000ff;
 const yellow = 0xffce00;
@@ -44,34 +49,6 @@ function addMesh(object) {
     return object;
 }
 
-function setSymmetricMatrixValue(matrix, object1, object2, value) {
-    const index1 = object1.userData.index;
-    const index2 = object2.userData.index;
-  
-    if (index1 < index2) {
-      if(matrix.length >= index1) {
-        matrix[index1] = [];
-      }
-      matrix[index1][index2] = value;
-    } else {
-        if(matrix.length >= index2) {
-            matrix[index2] = [];
-        }
-      matrix[index2][index1] = value;
-    }
-  }
-
-function getSymmetricMatrixValue(matrix, object1, object2) {
-    const index1 = object1.userData.index;
-    const index2 = object2.userData.index;
-
-    if (index1 < index2) {
-        return matrix[index1][index2];
-    } else {
-        return matrix[index2][index1];
-    }
-}
-  
 
 /////////////////////
 /* CREATE SCENE(S) */
@@ -125,7 +102,7 @@ function createCameras() {
    cameras['4'] = createOrthographicCamera(30, 30, 30); 
    // isometric perspective
    cameras['5'] = createPerspectiveCamera(18, 18, 18); 
-   activeCamera = cameras['1'];
+   activeCamera = cameras['4'];
 }
 
 /////////////////////
@@ -213,7 +190,7 @@ function createTrailer(x, y, z) {
     updatables.push(trailer);
     const direction = new THREE.Vector3();
     trailer.userData.tick = (delta) => {
-        if(getSymmetricMatrixValue(collisionMatrix, trailer, robot)) {
+        if(collisionAnimation.isAnimating) {
             return;
         }
         // Calculate the trailer's direction based on the pressed keys
@@ -229,12 +206,20 @@ function createTrailer(x, y, z) {
         newPosition.z += dz;
         
         // Check for collisions, record it and only update the position if there aren't any collisions
-        const collisions = checkCollisions(trailer, newPosition);
-        for(const collidingObject of collisions) {
-            setSymmetricMatrixValue(collisionMatrix, trailer, collidingObject, true);
-        }
-        if(collisions.length === 0) {
+        const hasCollision = (checkCollisions(trailer, newPosition).length > 0);
+        console.log(hasCollision);
+        if(!hasCollision) {
             trailer.position.copy(newPosition);
+        } else {
+            const startPosition = new THREE.Vector3();
+            trailer.getWorldPosition(startPosition);
+            const endPosition = robot.userData.connectionPoint;
+            const distance = startPosition.distanceTo(endPosition);
+            collisionAnimation.isAnimating = true;
+            collisionAnimation.startPosition = startPosition;
+            collisionAnimation.endPosition = endPosition;
+            collisionAnimation.duration = distance / trailer.userData.speed * 1000;
+            collisionAnimation.startTime = performance.now();
         }
     };
 }
@@ -487,65 +472,24 @@ function checkCollisions(object, newPosition){
 ///////////////////////
 /* HANDLE COLLISIONS */
 ///////////////////////
-function handleCollisionTrailerRobot(delta, i, j) {
+function handleCollisions() {
     'use strict';
-    const object1 = collisionObjects[i];
-    const object2 = collisionObjects[j];
-    let trailer, robot;
-    if(object1.userData.type === 'trailer') {
-        trailer = object1;
-        robot = object2;
-    } else {
-        trailer = object2;
-        robot = object1;
-    }
-
-    const connector = trailer.getObjectByName('connector');
-    const startPosition = new THREE.Vector3();
-    connector.getWorldPosition(startPosition);
-    const endPosition = robot.userData.connectionPoint;
-    if(startPosition.equals(endPosition)) {
-        collisionMatrix[i][j] = false;
+    if(!collisionAnimation.isAnimating) {
         return;
     }
-    const direction = new THREE.Vector3();
-    direction.subVectors(endPosition, startPosition);
-    direction.normalize();
-
-    const dx = direction.x * delta * trailer.userData.speed;
-    const dz = direction.z * delta * trailer.userData.speed;
-    trailer.position.x += dx;
-    trailer.position.z += dz;
-}
-
-function handleCollisions(delta) {
-    'use strict';
-    const limit = collisionObjects.length;
-    for(let i = 0; i < limit; i++) {
-        for(let j = i+1; j < limit; j++) {
-            if(!collisionMatrix[i][j]) {
-                continue;
-            }
-            var handler = collisionHandlers[i][j];
-            handler(delta, i, j);
-        }
+    const startPosition = collisionAnimation.startPosition;
+    const endPosition = collisionAnimation.endPosition;
+    const duration = collisionAnimation.duration;
+    const startTime = collisionAnimation.startTime;
+    const elapsedTime = performance.now() - startTime;
+    const t = Math.min(elapsedTime / duration, 1);
+    const newPosition = startPosition.clone().lerp(endPosition, t);
+    trailer.position.copy(newPosition);
+    if(t === 1) {
+        collisionAnimation.isAnimating = false;
     }
 }    
 
-///////////////////////
-/* SETUP COLLISIONS */
-///////////////////////
-function setupCollisions(){
-    'use strict';
-    const limit = collisionObjects.length; 
-    for(let i = 0; i < limit; i++) {
-        collisionMatrix[i] = [];
-        for(let j = i + 1; j < limit; j++) {
-            collisionMatrix[i][j] = false;
-        }
-    }
-    setSymmetricMatrixValue(collisionHandlers, robot, trailer, handleCollisionTrailerRobot); 
-}
 
 ////////////
 /* UPDATE */
@@ -556,7 +500,7 @@ function update(){
     for(const object of updatables) {
         object.userData.tick(delta);
     }
-    handleCollisions(delta);
+    handleCollisions();
 }
 
 /////////////
@@ -580,7 +524,6 @@ function init() {
 
     createScene();  
     createCameras();
-    setupCollisions();
 
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("keydown", onKeyDown);
@@ -610,7 +553,7 @@ function onResize() {
         const aspect = window.innerWidth / window.innerHeight;
         for (const key in cameras) {
             const camera = cameras[key];
-            if(key === 'perspectiveCamera') {
+            if(key === '5') {
                 camera.aspect = aspect;
             } else {
                 camera.left = - frustumSize * aspect / 2;
@@ -656,7 +599,7 @@ function onKeyUp(e){
         case '3':
         case '4':
         case '5':
-            if(!getSymmetricMatrixValue(collisionMatrix, trailer, robot)) {
+            if(!collisionAnimation.isAnimating) {
                 activeCamera =  cameras[key];
             }
             break;
