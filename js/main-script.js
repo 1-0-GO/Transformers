@@ -7,10 +7,13 @@ const cameras = {};
 const frustumSize = 40;
 // 3D objects
 const axis = new THREE.AxisHelper(20);
+var robot;
+var trailer;
 const updatables = [];
 const meshObjects = [];
-const collisionObjects = {};
-var collision = false;
+const collisionObjects = [];
+const collisionMatrix = [];
+const collisionHandlers = [];
 const red = 0xff3232;
 const blue = 0x0000ff;
 const yellow = 0xffce00;
@@ -40,6 +43,35 @@ function addMesh(object) {
     }
     return object;
 }
+
+function setSymmetricMatrixValue(matrix, object1, object2, value) {
+    const index1 = object1.userData.index;
+    const index2 = object2.userData.index;
+  
+    if (index1 < index2) {
+      if(matrix.length >= index1) {
+        matrix[index1] = [];
+      }
+      matrix[index1][index2] = value;
+    } else {
+        if(matrix.length >= index2) {
+            matrix[index2] = [];
+        }
+      matrix[index2][index1] = value;
+    }
+  }
+
+function getSymmetricMatrixValue(matrix, object1, object2) {
+    const index1 = object1.userData.index;
+    const index2 = object2.userData.index;
+
+    if (index1 < index2) {
+        return matrix[index1][index2];
+    } else {
+        return matrix[index2][index1];
+    }
+}
+  
 
 /////////////////////
 /* CREATE SCENE(S) */
@@ -83,12 +115,17 @@ function createPerspectiveCamera(x,y,z) {
 }
 
 function createCameras() {
-   cameras['frontalCamera'] = createOrthographicCamera(0, 0, 30); 
-   cameras['lateralCamera'] = createOrthographicCamera(-30, 0, 0); 
-   cameras['topCamera'] = createOrthographicCamera(0, 30, 0); 
-   cameras['isometricCamera'] = createOrthographicCamera(30, 30, 30); 
-   cameras['perspectiveCamera'] = createPerspectiveCamera(18, 18, 18); 
-   activeCamera = cameras['frontalCamera'];
+   // frontal
+   cameras['1'] = createOrthographicCamera(0, 0, 30); 
+   // lateral
+   cameras['2'] = createOrthographicCamera(-30, 0, 0); 
+   //top
+   cameras['3'] = createOrthographicCamera(0, 30, 0); 
+   // isometric orthographic
+   cameras['4'] = createOrthographicCamera(30, 30, 30); 
+   // isometric perspective
+   cameras['5'] = createPerspectiveCamera(18, 18, 18); 
+   activeCamera = cameras['1'];
 }
 
 /////////////////////
@@ -136,13 +173,14 @@ function createWheelsOnPlatform(group, dx, dz) {
 
 function createConnector(group, x, y, z) {
     const connector = createBoxMesh(4.8, 0.8, 0.8, blue);
+    connector.name = 'connector';
     connector.position.set(x, y, z);
     group.add(connector);
 }
 
 function createTrailer(x, y, z) {
     'use strict';
-    const trailer = new THREE.Group();
+    trailer = new THREE.Group();
 
     const container = createContainer(trailer);
     const params = container.geometry.parameters;
@@ -158,9 +196,10 @@ function createTrailer(x, y, z) {
     trailer.position.set(x, y, z);
     scene.add(trailer);
 
-    collisionObjects['trailer'] = trailer;
     const trailerAABB = calculateAABB(trailer);
     trailer.userData = {
+        type: 'trailer',
+        index: collisionObjects.length,
         speed: 10,
         AABB: {
             min: trailerAABB.minPoint.sub(trailer.position),
@@ -168,18 +207,35 @@ function createTrailer(x, y, z) {
         }
     };
 
+    collisionObjects.push(trailer);
+   
     // trailer animation
     updatables.push(trailer);
     const direction = new THREE.Vector3();
-    trailer.tick = (delta) => {
+    trailer.userData.tick = (delta) => {
+        if(getSymmetricMatrixValue(collisionMatrix, trailer, robot)) {
+            return;
+        }
         // Calculate the trailer's direction based on the pressed keys
         direction.x = Number(arrowKeysState['ArrowRight']) - Number(arrowKeysState['ArrowLeft']);
         direction.z = Number(arrowKeysState['ArrowUp']) - Number(arrowKeysState['ArrowDown'])
         direction.normalize();
 
-        // Update the trailer's position based on the direction, speed and time elapsed
-        trailer.position.x += direction.x * delta * trailer.userData.speed;
-        trailer.position.z += direction.z * delta * trailer.userData.speed;
+        // Update the trailer's new position based on the direction, speed and time elapsed
+        const dx = direction.x * delta * trailer.userData.speed;
+        const dz = direction.z * delta * trailer.userData.speed;
+        const newPosition = trailer.position.clone();
+        newPosition.x += dx;
+        newPosition.z += dz;
+        
+        // Check for collisions, record it and only update the position if there aren't any collisions
+        const collisions = checkCollisions(trailer, newPosition);
+        for(const collidingObject of collisions) {
+            setSymmetricMatrixValue(collisionMatrix, trailer, collidingObject, true);
+        }
+        if(collisions.length === 0) {
+            trailer.position.copy(newPosition);
+        }
     };
 }
 
@@ -215,7 +271,7 @@ function createArms(group, dx, x, y, z) {
 
     characterArmsGroup.position.set(x, y, z);
     
-    characterArmsGroup.tick = (delta) => {
+    characterArmsGroup.userData.tick = (delta) => {
     };
     updatables.push(characterArmsGroup);
 
@@ -266,7 +322,7 @@ function createHead(group, x, y, z) {
     const rightEye = createEye(characterHeadGroup, 0.5, 0.3, 0.9);
     const leftEye = createEye(characterHeadGroup, -0.5, 0.3, 0.9);
     
-    characterHeadGroup.tick = (delta) => {
+    characterHeadGroup.userData.tick = (delta) => {
     };
     updatables.push(characterHeadGroup);
 
@@ -317,7 +373,7 @@ function createLegs(group, dx, x, y, z) {
     const foot1 = createFoot(feet, -dx, 0, 0);
     const foot2 = createFoot(feet, dx, 0, 0);
     feet.position.set(0, -2.6, 0.5);
-    feet.tick = (delta) => {
+    feet.userData.tick = (delta) => {
     };
     updatables.push(feet);
 
@@ -328,7 +384,7 @@ function createLegs(group, dx, x, y, z) {
     characterLegsGroup.add(l1);
     characterLegsGroup.position.set(x, y, z);
 
-    characterLegsGroup.tick = (delta) => {
+    characterLegsGroup.userData.tick = (delta) => {
     };
     updatables.push(characterLegsGroup);
 
@@ -336,7 +392,7 @@ function createLegs(group, dx, x, y, z) {
 }
 
 function createRobot(x, y, z) {
-    const robot = new THREE.Group();
+    robot = new THREE.Group();
     
     const base = createBase(robot);
     
@@ -356,14 +412,18 @@ function createRobot(x, y, z) {
     robot.position.set(x, y, z);
     scene.add(robot);
 
-    collisionObjects['robot'] = robot;
     const robotAABB = calculateAABB(robot);
     robot.userData = {
+        type: 'robot',
+        index: collisionObjects.length,
+        connectionPoint: new THREE.Vector3(0, 0, 0),
         AABB: {
             min: robotAABB.minPoint.sub(robot.position),
             max: robotAABB.maxPoint.sub(robot.position)
         }
     };
+
+    collisionObjects.push(robot);
 }
 
 function calculateAABB(object) {
@@ -391,36 +451,100 @@ function calculateAABB(object) {
     return {minPoint, maxPoint};
 }
 
-//////////////////////
-/* CHECK COLLISIONS */
-//////////////////////
-function checkCollisions() {
-    'use strict';
-    const robot = collisionObjects['robot'];
-    const trailer = collisionObjects['trailer'];
-    const robotAABB = robot.userData.AABB;
-    const trailerAABB = trailer.userData.AABB;
-    const robotMax = robotAABB.max.clone().add(robot.position);
-    const robotMin = robotAABB.min.clone().add(robot.position);
-    const trailerMax = trailerAABB.max.clone().add(trailer.position);
-    const trailerMin = trailerAABB.min.clone().add(trailer.position);
 
-    return (
-        robotMax.x > trailerMin.x &&
-        robotMin.x < trailerMax.x &&
-        robotMax.y > trailerMin.y &&
-        robotMin.y < trailerMax.y &&
-        robotMax.z > trailerMin.z &&
-        robotMin.z < trailerMax.z
-      );
+///////////////////////
+/* CHECK COLLISIONS  */
+///////////////////////
+function checkCollisions(object, newPosition){
+    'use strict';
+    const collisions = [];
+    const objectAABB = object.userData.AABB;
+    const objectMax = objectAABB.max.clone().add(newPosition);
+    const objectMin = objectAABB.min.clone().add(newPosition);
+    for(const object2 of collisionObjects) {
+        if(object2 === object) {
+            continue;
+        }
+        const object2AABB = object2.userData.AABB;
+        const object2Max = object2AABB.max.clone().add(object2.position);
+        const object2Min = object2AABB.min.clone().add(object2.position);
+        
+        const collision = 
+            objectMax.x > object2Min.x &&
+            objectMin.x < object2Max.x &&
+            objectMax.y > object2Min.y &&
+            objectMin.y < object2Max.y &&
+            objectMax.z > object2Min.z &&
+            objectMin.z < object2Max.z;
+        if(collision) {
+            collisions.push(object2);
+        }
+    }
+    return collisions;
 }
+
 
 ///////////////////////
 /* HANDLE COLLISIONS */
 ///////////////////////
-function handleCollisions(){
+function handleCollisionTrailerRobot(delta, i, j) {
     'use strict';
+    const object1 = collisionObjects[i];
+    const object2 = collisionObjects[j];
+    let trailer, robot;
+    if(object1.userData.type === 'trailer') {
+        trailer = object1;
+        robot = object2;
+    } else {
+        trailer = object2;
+        robot = object1;
+    }
 
+    const connector = trailer.getObjectByName('connector');
+    const startPosition = new THREE.Vector3();
+    connector.getWorldPosition(startPosition);
+    const endPosition = robot.userData.connectionPoint;
+    if(startPosition.equals(endPosition)) {
+        collisionMatrix[i][j] = false;
+        return;
+    }
+    const direction = new THREE.Vector3();
+    direction.subVectors(endPosition, startPosition);
+    direction.normalize();
+
+    const dx = direction.x * delta * trailer.userData.speed;
+    const dz = direction.z * delta * trailer.userData.speed;
+    trailer.position.x += dx;
+    trailer.position.z += dz;
+}
+
+function handleCollisions(delta) {
+    'use strict';
+    const limit = collisionObjects.length;
+    for(let i = 0; i < limit; i++) {
+        for(let j = i+1; j < limit; j++) {
+            if(!collisionMatrix[i][j]) {
+                continue;
+            }
+            var handler = collisionHandlers[i][j];
+            handler(delta, i, j);
+        }
+    }
+}    
+
+///////////////////////
+/* SETUP COLLISIONS */
+///////////////////////
+function setupCollisions(){
+    'use strict';
+    const limit = collisionObjects.length; 
+    for(let i = 0; i < limit; i++) {
+        collisionMatrix[i] = [];
+        for(let j = i + 1; j < limit; j++) {
+            collisionMatrix[i][j] = false;
+        }
+    }
+    setSymmetricMatrixValue(collisionHandlers, robot, trailer, handleCollisionTrailerRobot); 
 }
 
 ////////////
@@ -430,9 +554,9 @@ function update(){
     'use strict';
     const delta = clock.getDelta();
     for(const object of updatables) {
-        object.tick(delta);
+        object.userData.tick(delta);
     }
-    collision = checkCollisions();
+    handleCollisions(delta);
 }
 
 /////////////
@@ -456,6 +580,7 @@ function init() {
 
     createScene();  
     createCameras();
+    setupCollisions();
 
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("keydown", onKeyDown);
@@ -527,20 +652,14 @@ function onKeyUp(e){
     var key = e.key;
     switch (key) {
         case '1':
-            activeCamera = cameras['frontalCamera'];
-            break;
         case '2':
-            activeCamera = cameras['lateralCamera'];
-            break;
         case '3':
-            activeCamera = cameras['topCamera'];
-            break;
         case '4':
-            activeCamera = cameras['isometricCamera'];
-            break; 
         case '5':
-            activeCamera = cameras['perspectiveCamera'];
-            break; 
+            if(!getSymmetricMatrixValue(collisionMatrix, trailer, robot)) {
+                activeCamera =  cameras[key];
+            }
+            break;
         case '6':
             for(const mesh of meshObjects) {
                 mesh.material.wireframe = !mesh.material.wireframe;
